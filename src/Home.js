@@ -15,8 +15,8 @@ import { AiOutlineBank } from "react-icons/ai";
 import { GrCurrency } from "react-icons/gr";
 import { MdChevronRight, MdSettings } from "react-icons/md";
 import { Link } from "react-router-dom";
+import firebase from "firebase/app";
 import App from "./App";
-import Login from "./Login";
 import Sidebar from "./Sidebar";
 
 export default function Home() {
@@ -75,6 +75,65 @@ export default function Home() {
   );
 }
 const Balance = () => {
+  const [bal, setBal] = useState([
+    {
+      accountName: "Cash",
+      balance: 0,
+      index: 0,
+      updatedAt: "Never",
+    },
+  ]);
+  useEffect(() => {
+    const db = firebase.firestore();
+    let unsub = db
+      .collection("users")
+      .doc(firebase.auth().currentUser.uid)
+      .onSnapshot((doc) => {
+        if (doc.exists) {
+          if (doc.data().balance) {
+            let arr = doc.data().balance;
+            arr.sort((a, b) => a.index - b.index);
+            setBal(arr);
+          }
+          console.log(doc.data());
+        }
+      });
+    return () => {
+      unsub();
+    };
+  }, []);
+  const BalCard = (props) => {
+    return (
+      <div className="card">
+        <div style={{ display: "flex", alignItems: "center" }}>
+          {props.accountName === "Cash" ? (
+            <GrCurrency
+              className="black"
+              style={{ fontSize: "1.2rem", marginRight: "10px" }}
+            />
+          ) : (
+            <AiOutlineBank
+              className="black"
+              style={{ fontSize: "1.2rem", marginRight: "10px" }}
+            />
+          )}
+          <p>{props.accountName}</p>
+        </div>
+        <h2 className="currency">
+          {`${Intl.NumberFormat(undefined, {
+            style: "currency",
+            currency: "INR",
+          }).format(props.balance)}`}
+        </h2>
+        <p className="email" style={{ fontSize: "small" }}>
+          Last updated:{" "}
+          {props.updatedAt === "Never"
+            ? "Never"
+            : new Date(props.updatedAt).toLocaleDateString()}
+        </p>
+      </div>
+    );
+  };
   return (
     <div className="balance">
       <div className="head">
@@ -90,52 +149,14 @@ const Balance = () => {
         </Link>
       </div>
       <div className="bal-grid">
-        <div className="card">
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <GrCurrency
-              className="black"
-              style={{ fontSize: "1.2rem", marginRight: "10px" }}
-            />
-            <p>Cash</p>
-          </div>
-          <h2 className="currency">
-            {`${Intl.NumberFormat(undefined, {
-              style: "currency",
-              currency: "INR",
-            }).format(1000)}`}
-          </h2>
-          <p className="email">Last updated</p>
-        </div>
-        <div className="card">
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <AiOutlineBank
-              className="black"
-              style={{ fontSize: "1.2rem", marginRight: "10px" }}
-            />
-            <p>HDFC</p>
-          </div>
-          <h2 className="currency">
-            {`${Intl.NumberFormat("en-IN", {
-              style: "currency",
-              currency: "INR",
-            }).format(1000)}`}
-          </h2>
-        </div>
-        <div className="card">
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <AiOutlineBank
-              className="black"
-              style={{ fontSize: "1.2rem", marginRight: "10px" }}
-            />
-            <p>HDFC2</p>
-          </div>
-          <h2 className="currency">
-            {`${Intl.NumberFormat("en-IN", {
-              style: "currency",
-              currency: "INR",
-            }).format(1000)}`}
-          </h2>
-        </div>
+        {bal.map((data, index) => (
+          <BalCard
+            key={`${index}-${data.accountName}`}
+            accountName={data.accountName}
+            balance={data.balance}
+            updatedAt={data.updatedAt}
+          />
+        ))}
       </div>
     </div>
   );
@@ -426,8 +447,8 @@ function TransacsMob({ rows }) {
       style={{ padding: "5px", display: "none" }}>
       <List dense={true}>
         {rows.map((data, index) => (
-          <div>
-            <ListItem button key={index}>
+          <div key={index}>
+            <ListItem button>
               <ListItemText
                 primary={data.month}
                 secondary={`${currencyFormat(data.closeBal)} [${

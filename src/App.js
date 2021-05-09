@@ -10,9 +10,8 @@ import {
 } from "@material-ui/core";
 import { IoAnalyticsOutline } from "react-icons/io5";
 import { AiOutlineHistory } from "react-icons/ai";
-import { MdClose, MdMenu, MdPerson } from "react-icons/md";
+import { MdClose, MdMenu } from "react-icons/md";
 import React, { useEffect, useState } from "react";
-import { FirebaseAuthConsumer } from "@react-firebase/auth";
 import { Link } from "react-router-dom";
 
 function App({ user }) {

@@ -13,14 +13,17 @@ import {
   DialogActions,
   TextField,
   InputAdornment,
+  ListItemSecondaryAction,
+  IconButton,
 } from "@material-ui/core";
 import { FirebaseAuthConsumer } from "@react-firebase/auth";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AiOutlineBank } from "react-icons/ai";
-import { MdPersonAdd, MdSearch } from "react-icons/md";
+import { MdDelete, MdPersonAdd, MdSearch } from "react-icons/md";
 import { GrCurrency } from "react-icons/gr";
 import { Link } from "react-router-dom";
 import App from "./App";
+import firebase from "firebase/app";
 import { signOut } from "./firebase";
 import { banks } from "./banks";
 import { Autocomplete } from "@material-ui/lab";
@@ -48,24 +51,7 @@ export default function Profile() {
                   <Divider />
                   <List style={{ padding: 0 }}>
                     <List>
-                      <ListItem>
-                        <ListItemIcon>
-                          <GrCurrency
-                            className="black"
-                            style={{ fontSize: "1.2rem" }}
-                          />
-                        </ListItemIcon>
-                        <ListItemText>Cash</ListItemText>
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon>
-                          <AiOutlineBank
-                            className="black"
-                            style={{ fontSize: "1.2rem" }}
-                          />
-                        </ListItemIcon>
-                        <ListItemText>HDFC</ListItemText>
-                      </ListItem>
+                      <AccountList />
                       <ListItem>
                         <DialogBox />
                       </ListItem>
@@ -82,6 +68,7 @@ export default function Profile() {
                     <Divider />
                   </List>
                   <Button
+                    color="secondary"
                     variant="outlined"
                     style={{ marginTop: "20px" }}
                     onClick={signOut}>
@@ -96,13 +83,140 @@ export default function Profile() {
     </FirebaseAuthConsumer>
   );
 }
+const AccountList = () => {
+  const [acc, setAcc] = useState([
+    {
+      accountName: "Cash",
+      balance: 0,
+      index: 0,
+      updatedAt: "Never",
+    },
+  ]);
+  useEffect(() => {
+    const db = firebase.firestore();
+    let unsub = db
+      .collection("users")
+      .doc(firebase.auth().currentUser.uid)
+      .onSnapshot((doc) => {
+        if (doc.exists) {
+          if (doc.data().balance) {
+            let arr = doc.data().balance;
+            arr.sort((a, b) => a.index - b.index);
+            setAcc(arr);
+          }
+          console.log(doc.data());
+        }
+      });
+    return () => {
+      unsub();
+    };
+  }, []);
+  const handleClick = (data) => {
+    let db = firebase.firestore();
+    let docRef = db
+      .collection("users")
+      .doc(`${firebase.auth().currentUser.uid}`);
+    docRef
+      .update({
+        balance: firebase.firestore.FieldValue.arrayRemove(data),
+      })
+      .then(() => {
+        console.log("removed");
+      })
+      .catch((err) => console.error(err));
+  };
+  return (
+    <>
+      {acc.map((data, index) => (
+        <ListItem key={index + "-accList"}>
+          <ListItemIcon>
+            {data.accountName === "Cash" ? (
+              <GrCurrency
+                className="black"
+                style={{ fontSize: "1.2rem", marginRight: "10px" }}
+              />
+            ) : (
+              <AiOutlineBank
+                className="black"
+                style={{ fontSize: "1.2rem", marginRight: "10px" }}
+              />
+            )}
+          </ListItemIcon>
+          <ListItemText>{data.accountName}</ListItemText>
+          {data.accountName !== "Cash" ? (
+            <ListItemSecondaryAction>
+              <IconButton
+                edge="end"
+                color="secondary"
+                onClick={() => {
+                  handleClick(data);
+                }}>
+                <MdDelete />
+              </IconButton>
+            </ListItemSecondaryAction>
+          ) : null}
+        </ListItem>
+      ))}
+    </>
+  );
+};
 const DialogBox = () => {
   const [open, setOpen] = useState(false);
   const [bank, setBank] = useState("");
   const [accountNo, setAccount] = useState("");
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
-  // const handleClick = (d) => setBank(d);
+  const handleClick = (d) => {
+    let db = firebase.firestore();
+    let docRef = db
+      .collection("users")
+      .doc(`${firebase.auth().currentUser.uid}`);
+    docRef.get().then((doc) => {
+      if (doc.data().balance) {
+        docRef
+          .update({
+            balance: firebase.firestore.FieldValue.arrayUnion({
+              accountName: d,
+              index: doc.data().balance.length,
+              balance: 0,
+              updatedAt: "Never",
+            }),
+          })
+          .then(() => {
+            handleClose();
+            console.log("updated");
+          })
+          .catch((err) => console.error(err));
+      } else {
+        docRef
+          .set(
+            {
+              balance: [
+                {
+                  accountName: "Cash",
+                  balance: 0,
+                  index: 0,
+                  updatedAt: "Never",
+                },
+                {
+                  accountName: d,
+                  balance: 0,
+                  index: 1,
+                  updatedAt: "Never",
+                },
+              ],
+            },
+            { merge: true }
+          )
+          .then(() => {
+            handleClose();
+            console.log("set");
+          })
+          .catch((err) => console.error(err));
+      }
+    });
+  };
+
   const fs = useMediaQuery(useTheme().breakpoints.down("xs"));
   return (
     <>
@@ -110,6 +224,7 @@ const DialogBox = () => {
         fullWidth
         variant="outlined"
         onClick={handleOpen}
+        color="primary"
         startIcon={<AiOutlineBank />}>
         Add bank account
       </Button>
@@ -184,7 +299,10 @@ const DialogBox = () => {
           {bank === "" ? null : (
             <Button
               color="primary"
-              onClick={() => console.log(`${bank}-${accountNo}`)}>
+              onClick={() => {
+                console.log(`${bank}${accountNo ? `-${accountNo}` : ""}`);
+                handleClick(`${bank}${accountNo ? `-${accountNo}` : ""}`);
+              }}>
               Continue
             </Button>
           )}

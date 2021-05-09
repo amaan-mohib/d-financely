@@ -28,18 +28,20 @@ export default function Login() {
 export function IfUnAuthed() {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    firebase.auth().onAuthStateChanged((user) => {
+    let unsub = firebase.auth().onAuthStateChanged((user) => {
       if (user) {
         setLoading(false);
       } else {
         setLoading(false);
       }
     });
-    if (firebase.auth().currentUser) setLoading(false);
+    return () => {
+      unsub();
+    };
   }, []);
   return (
     <>
-      <nav>
+      <nav style={{ justifyContent: "center" }}>
         <Link to="/" className="drawer-links">
           <h1 className="heading">δ Financely</h1>
         </Link>
