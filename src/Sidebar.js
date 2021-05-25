@@ -17,25 +17,44 @@ import React, { useEffect, useState } from "react";
 import { MdAdd, MdCheck, MdRemove } from "react-icons/md";
 import firebase from "firebase/app";
 import { Link } from "react-router-dom";
+import axios from "axios";
+import { API } from "./config";
+import { useDispatch, useSelector } from "react-redux";
+import { getAccList, transacUpdate } from "./actions";
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState("");
   const [budget, setBudget] = useState("");
-  const [bal, setBal] = useState([
-    {
-      accountName: "Cash",
-      balance: 0,
-      index: 0,
-      updatedAt: "Never",
-    },
-  ]);
+  // const [bal, setBal] = useState([
+  //   {
+  //     accountName: "Cash",
+  //     balance: 0,
+  //     index: 0,
+  //     updatedAt: "Never",
+  //   },
+  // ]);
+  const bal = useSelector((state) => state.accounts);
+  const dispatch = useDispatch();
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
   const handleChange = (event) => {
     setVal(event.target.value);
   };
   const fs = useMediaQuery(useTheme().breakpoints.down("xs"));
+  const readData = () => {
+    dispatch(transacUpdate());
+    axios
+      .get(`${API}/accounts/${firebase.auth().currentUser.uid}`)
+      .then((res) => {
+        console.log(res.data);
+        if (res.data.length > 0) {
+          dispatch(getAccList(res.data));
+          dispatch(transacUpdate());
+        }
+      })
+      .catch((err) => console.error(err));
+  };
   const formik = useFormik({
     initialValues: {
       account: 0,
@@ -49,139 +68,185 @@ export default function Sidebar() {
       createdAt: new Date(),
     },
     onSubmit: (values, actions) => {
-      console.log(values);
-      let db = firebase.firestore();
-      let docRef = db.collection(
-        `${firebase.auth().currentUser.uid}-${values.account}`
-      );
-      docRef
-        .doc(`${values.date}`)
-        .set(values)
-        .then(() => {
-          docRef
-            .orderBy("date", "desc")
-            .limit(1)
-            .get()
-            .then((query) => {
-              query.forEach((doc) => {
-                let arr = doc.data();
-                let dr = db
-                  .collection("users")
-                  .doc(`${firebase.auth().currentUser.uid}`);
-                dr.get()
-                  .then((doc) => {
-                    if (doc.data().balance) {
-                      doc.data().balance.map((doc) => {
-                        let d = doc;
-                        if (d.updatedAt !== arr.date) {
-                          if (d.index === arr.account) {
-                            dr.update({
-                              balance: firebase.firestore.FieldValue.arrayRemove(
-                                d
-                              ),
-                            })
-                              .then(() => {
-                                console.log("removed");
-                                dr.update({
-                                  balance: firebase.firestore.FieldValue.arrayUnion(
-                                    {
-                                      accountName: d.accountName,
-                                      balance:
-                                        d.index === 0
-                                          ? arr.amountType === "debit"
-                                            ? Number(d.balance) -
-                                              Number(arr.amount)
-                                            : Number(d.balance) +
-                                              Number(arr.amount)
-                                          : Number(arr.openingBal) +
-                                            Number(arr.credit) -
-                                            Number(arr.debit),
-                                      index: d.index,
-                                      updatedAt: arr.date,
-                                    }
-                                  ),
-                                })
-                                  .then(() => {
-                                    console.log("updated");
-                                    //ho gaya
-                                  })
-                                  .catch((err) => console.error(err));
-                              })
-                              .catch((err) => console.error(err));
-                          }
-                        }
-                      });
-                    } else {
-                      dr.set(
-                        {
-                          balance: [
-                            {
-                              accountName: "Cash",
-                              balance:
-                                arr.amountType === "debit"
-                                  ? 0 - Number(arr.amount)
-                                  : 0 + Number(arr.amount),
-                              index: 0,
-                              updatedAt: arr.date,
-                            },
-                          ],
-                        },
-                        { merge: true }
-                      )
-                        .then(() => {
-                          console.log("set");
-                          //ho gaya
-                        })
-                        .catch((err) => console.error(err));
-                    }
-                  })
-                  .catch((err) => console.error(err));
-              });
-            });
-        })
-        .catch((err) => console.error(err));
+      if (values.account === 0) {
+        axios
+          .post(`${API}/cash/add`, [
+            {
+              amount:
+                values.amountType === "debit"
+                  ? -Math.abs(values.amount)
+                  : values.amount,
+              description: values.desc,
+              updatedAt: values.date,
+              balance:
+                bal[0].balance +
+                (values.amountType === "debit"
+                  ? -Math.abs(values.amount)
+                  : values.amount),
+              user_id: firebase.auth().currentUser.uid,
+            },
+          ])
+          .then(() => {
+            if (bal.length > 1) {
+              axios
+                .put(`${API}/accounts/update`, {
+                  balance:
+                    bal[0].balance +
+                    (values.amountType === "debit"
+                      ? -Math.abs(values.amount)
+                      : values.amount),
+                  updatedAt: values.date,
+                  accountName: "Cash",
+                  user_id: firebase.auth().currentUser.uid,
+                })
+                .then(() => {
+                  readData();
+                })
+                .catch((err) => console.error(err));
+            } else {
+              axios
+                .post(`${API}/accounts/add`, [
+                  {
+                    accountName: "Cash",
+                    balance:
+                      bal[0].balance +
+                      (values.amountType === "debit"
+                        ? -Math.abs(values.amount)
+                        : values.amount),
+                    updatedAt: values.date,
+                    user_id: firebase.auth().currentUser.uid,
+                  },
+                ])
+                .then(() => {
+                  readData();
+                })
+                .catch((err) => console.error(err));
+            }
+          })
+          .catch((err) => console.error(err));
+      } else {
+        axios
+          .get(
+            `${API}/banks/${bal[values.account].id}/${
+              firebase.auth().currentUser.uid
+            }/1`
+          )
+          .then((res) => {
+            axios
+              .post(`${API}/banks/add`, [
+                {
+                  account: bal[values.account].accountName,
+                  month: values.date,
+                  openingBalance: values.openingBal,
+                  debit: values.debit,
+                  credit: values.credit,
+                  closingBalance:
+                    values.openingBal + values.credit - values.debit,
+                  user_id: firebase.auth().currentUser.uid,
+                  account_id: bal[values.account].id,
+                },
+              ])
+              .then(() => {
+                let bool = true;
+                if (res.data.length > 0) {
+                  if (new Date(res.data[0].month) > new Date(values.date)) {
+                    bool = false;
+                  }
+                }
+                if (bool) {
+                  axios
+                    .put(`${API}/accounts/update`, {
+                      balance: values.openingBal + values.credit - values.debit,
+                      updatedAt: values.date,
+                      accountName: bal[values.account].accountName,
+                      user_id: firebase.auth().currentUser.uid,
+                    })
+                    .then(() => {
+                      readData();
+                    })
+                    .catch((err) => console.error(err));
+                }
+              })
+              .catch((err) => console.error(err));
+          })
+          .catch((err) => console.error(err));
+      }
       actions.resetForm();
       handleClose();
     },
   });
-  const updateBudget = (budget) => {
-    let db = firebase.firestore();
-    let docRef = db
-      .collection("users")
-      .doc(`${firebase.auth().currentUser.uid}`);
-    docRef
-      .set(
-        {
-          budget: budget,
-        },
-        { merge: true }
-      )
-      .then(() => setBudget(budget))
+  const updateBudget = (amount) => {
+    // let db = firebase.firestore();
+    // let docRef = db
+    //   .collection("users")
+    //   .doc(`${firebase.auth().currentUser.uid}`);
+    // docRef
+    //   .set(
+    //     {
+    //       budget: budget,
+    //     },
+    //     { merge: true }
+    //   )
+    //   .then(() => setBudget(budget))
+    //   .catch((err) => console.error(err));
+    if (budget === "") {
+      axios
+        .post(`${API}/budget/add`, [
+          {
+            amount: amount,
+            user_id: firebase.auth().currentUser.uid,
+          },
+        ])
+        .then(() => {
+          setBudget(amount.toString());
+        })
+        .catch((err) => console.error(err));
+    } else {
+      axios
+        .put(`${API}/budget/update`, {
+          amount: amount,
+          user_id: firebase.auth().currentUser.uid,
+        })
+        .then(() => setBudget(amount.toString()))
+        .catch((err) => console.error(err));
+    }
+  };
+  const readBudget = () => {
+    axios
+      .get(`${API}/budget/${firebase.auth().currentUser.uid}`)
+      .then((res) => {
+        console.log(res.data);
+        if (res.data.length > 0) {
+          setVal(res.data[0].amount);
+          setBudget(res.data[0].amount);
+        }
+      })
       .catch((err) => console.error(err));
   };
   useEffect(() => {
-    let db = firebase.firestore();
-    let docRef = db
-      .collection("users")
-      .doc(`${firebase.auth().currentUser.uid}`);
-    docRef.get().then((data) => {
-      if (data.data().balance) {
-        let arr = data.data().balance;
-        arr.sort((a, b) => a.index - b.index);
-        setBal(arr);
-      }
-    });
-    let unsub = docRef.onSnapshot((data) => {
-      if (data.exists) {
-        if (data.data().budget) {
-          setVal(data.data().budget);
-          setBudget(data.data().budget);
-        }
-      }
-    });
-    return () => {
-      unsub();
-    };
+    // let db = firebase.firestore();
+    // let docRef = db
+    //   .collection("users")
+    //   .doc(`${firebase.auth().currentUser.uid}`);
+    // docRef.get().then((data) => {
+    //   if (data.data().balance) {
+    //     let arr = data.data().balance;
+    //     arr.sort((a, b) => a.index - b.index);
+    //     setBal(arr);
+    //   }
+    // });
+    // let unsub = docRef.onSnapshot((data) => {
+    //   if (data.exists) {
+    //     if (data.data().budget) {
+    //       setVal(data.data().budget);
+    //       setBudget(data.data().budget);
+    //     }
+    //   }
+    // });
+    // return () => {
+    //   unsub();
+    // };
+    readBudget();
   }, []);
 
   return (
@@ -209,7 +274,7 @@ export default function Sidebar() {
               value={formik.values.account}
               onChange={formik.handleChange}>
               {bal.map((data, index) => (
-                <MenuItem key={`${index}-menu`} value={data.index}>
+                <MenuItem key={`${index}-menu`} value={index}>
                   {data.accountName}
                 </MenuItem>
               ))}

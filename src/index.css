@@ -2,8 +2,9 @@
 :root {
   --nav-height: 60px;
   --full-height: calc(100vh - var(--nav-height));
-  --nav-bg: hsl(0, 0%, 90%);
+  --nav-bg: #e6e6e6;
   --border: hsla(0, 0%, 0%, 25%);
+  --warning: yellow;
 }
 * {
   margin: 0;
@@ -22,7 +23,7 @@ p {
 header {
   margin-bottom: 10px;
 }
-nav {
+nav:not(.pagination) {
   position: fixed;
   top: 0;
   width: 100%;
@@ -176,6 +177,20 @@ nav > div {
   -webkit-animation: spin 2s linear infinite; /* Safari */
   animation: spin 2s linear infinite;
 }
+#transaction-table th {
+  padding: 15px 10px;
+  font-weight: 600;
+}
+#transaction-table,
+th,
+td {
+  border: 1px solid var(--border);
+  border-collapse: collapse;
+  padding: 5px 10px;
+}
+/* #transaction-table td{
+  text-align: right;
+} */
 /* Safari */
 @-webkit-keyframes spin {
   0% {
@@ -214,7 +229,8 @@ nav > div {
     margin-left: 0;
   }
   .transac-mob {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column;
   }
   .transac-comp {
     display: none !important;

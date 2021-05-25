@@ -13,11 +13,15 @@ import { FirebaseAuthConsumer } from "@react-firebase/auth";
 import { Chart, Line } from "react-chartjs-2";
 import { AiOutlineBank } from "react-icons/ai";
 import { GrCurrency } from "react-icons/gr";
-import { MdChevronRight, MdSettings } from "react-icons/md";
+import { MdChevronRight, MdInfoOutline, MdSettings } from "react-icons/md";
 import { Link } from "react-router-dom";
 import firebase from "firebase/app";
 import App from "./App";
 import Sidebar from "./Sidebar";
+import { useDispatch, useSelector } from "react-redux";
+import { getAccList } from "./actions";
+import axios from "axios";
+import { API } from "./config";
 
 export default function Home() {
   let img = null;
@@ -75,33 +79,28 @@ export default function Home() {
   );
 }
 const Balance = () => {
-  const [bal, setBal] = useState([
-    {
-      accountName: "Cash",
-      balance: 0,
-      index: 0,
-      updatedAt: "Never",
-    },
-  ]);
+  // const [bal, setBal] = useState([
+  //   {
+  //     accountName: "Cash",
+  //     balance: 0,
+  //     index: 0,
+  //     updatedAt: "Never",
+  //   },
+  // ]);
+  const bal = useSelector((state) => state.accounts);
+  const dispatch = useDispatch();
+  const readData = () => {
+    axios
+      .get(`${API}/accounts/${firebase.auth().currentUser.uid}`)
+      .then((res) => {
+        console.log(res.data);
+        if (res.data.length > 0) dispatch(getAccList(res.data));
+      })
+      .catch((err) => console.error(err));
+  };
   useEffect(() => {
-    const db = firebase.firestore();
-    let unsub = db
-      .collection("users")
-      .doc(firebase.auth().currentUser.uid)
-      .onSnapshot((doc) => {
-        if (doc.exists) {
-          if (doc.data().balance) {
-            let arr = doc.data().balance;
-            arr.sort((a, b) => a.index - b.index);
-            setBal(arr);
-          }
-          console.log(doc.data());
-        }
-      });
-    return () => {
-      unsub();
-    };
-  }, []);
+    readData();
+  }, [dispatch]);
   const BalCard = (props) => {
     return (
       <div className="card">
@@ -119,17 +118,36 @@ const Balance = () => {
           )}
           <p>{props.accountName}</p>
         </div>
+        {props.initialBalance === 0 && props.accountName === "Cash" ? (
+          <Link to="/profile">
+            <p
+              className="email"
+              style={{
+                fontSize: "small",
+                display: "flex",
+                alignItems: "center",
+              }}>
+              <MdInfoOutline style={{ marginRight: 5 }} />
+              Set initial balance to avoid discrepancies &gt;
+            </p>
+          </Link>
+        ) : null}
+
         <h2 className="currency">
           {`${Intl.NumberFormat(undefined, {
             style: "currency",
             currency: "INR",
-          }).format(props.balance)}`}
+          }).format(
+            props.accountName === "Cash"
+              ? props.initialBalance + props.balance
+              : props.balance
+          )}`}
         </h2>
         <p className="email" style={{ fontSize: "small" }}>
-          Last updated:{" "}
+          Last record:&nbsp;
           {props.updatedAt === "Never"
             ? "Never"
-            : new Date(props.updatedAt).toLocaleDateString()}
+            : new Date(props.updatedAt).toLocaleDateString(["en-IN", "en-US"])}
         </p>
       </div>
     );
@@ -154,6 +172,7 @@ const Balance = () => {
             key={`${index}-${data.accountName}`}
             accountName={data.accountName}
             balance={data.balance}
+            initialBalance={data.initialBalance}
             updatedAt={data.updatedAt}
           />
         ))}
@@ -162,84 +181,27 @@ const Balance = () => {
   );
 };
 const Analytics = () => {
-  let labels = [];
-  let months = [];
-  useEffect(() => {}, []);
-  for (let i = 0; i < 4; i++) {
-    const today = new Date();
-    const monthNow = new Date();
-    let date = today.setDate(today.getDate() - i);
-    let month = monthNow.setMonth(monthNow.getMonth() - (i + 1));
-    labels.push(
-      Intl.DateTimeFormat("en-IN", {
-        day: "numeric",
-        month: "numeric",
-      }).format(date)
-    );
-    months.push(Intl.DateTimeFormat("en-IN", { month: "short" }).format(month));
-  }
-  console.log(months);
-  const balance = {
-    data: {
-      labels: labels.reverse(),
-      datasets: [
-        {
-          label: "Balance",
-          data: [800, 500, 900, 1000].reverse(),
-          fill: false,
-          backgroundColor: "rgb(255, 99, 132)",
-          borderColor: "rgb(255, 99, 132)",
-          tension: 0.2,
-        },
-      ],
-    },
-    options: {
+  const transactions = useSelector((state) => state.transactions);
+  const acc = useSelector((state) => state.accounts);
+  const [budget, setBudget] = useState(0);
+  useEffect(() => {
+    axios
+      .get(`${API}/budget/${firebase.auth().currentUser.uid}`)
+      .then((res) => {
+        if (res.data.length > 0) {
+          setBudget(res.data[0].amount);
+        }
+      })
+      .catch((err) => console.error(err));
+  }, []);
+
+  const options = (e) => {
+    return {
       responsive: true,
       plugins: {
         title: {
           display: true,
-          text: "Balance",
-          align: "start",
-        },
-        legend: {
-          display: false,
-        },
-      },
-      scales: {
-        x: {
-          grid: {
-            drawBorder: false,
-            drawOnChartArea: false,
-          },
-        },
-        y: {
-          grid: {
-            drawBorder: false,
-          },
-        },
-      },
-    },
-  };
-  const expenses = {
-    data: {
-      labels: months.reverse(),
-      datasets: [
-        {
-          label: "Expenses",
-          data: [NaN, 300, 400, 100].reverse(),
-          fill: false,
-          backgroundColor: "rgb(255, 99, 132)",
-          borderColor: "rgb(255, 99, 132)",
-          tension: 0.2,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: "Expenses",
+          text: e,
           align: "start",
         },
         legend: {
@@ -257,13 +219,114 @@ const Analytics = () => {
           grid: {
             drawBorder: false,
             color: function (context) {
-              if (context.tick.value === 300) return "#ff0000";
+              if (context.tick.value === budget && e === "Expenses")
+                return "#ff0000";
               else return Chart.defaults.borderColor;
             },
           },
         },
       },
-    },
+    };
+  };
+  const balance = (data) => {
+    let labels = [];
+    let datasets = [];
+    data.map((doc) => {
+      labels.push(
+        doc.month
+          ? Intl.DateTimeFormat(undefined, {
+              month: "short",
+              year: "2-digit",
+            }).format(new Date(doc.month))
+          : Intl.DateTimeFormat(undefined, {
+              day: "numeric",
+              month: "numeric",
+            }).format(new Date(doc.updatedAt))
+      );
+      datasets.push(
+        doc.closingBalance
+          ? doc.closingBalance
+          : acc[0].initialBalance + doc.balance
+      );
+      return 0;
+    });
+    return {
+      labels: labels.reverse(),
+      datasets: [
+        {
+          label: "Balance",
+          data: datasets.reverse(),
+          fill: false,
+          backgroundColor: "rgb(255, 99, 132)",
+          borderColor: "rgb(255, 99, 132)",
+          tension: 0.2,
+        },
+      ],
+    };
+  };
+  const expenses = (data) => {
+    let labels = [];
+    let datasets = [];
+    data.map((doc) => {
+      labels.push(
+        doc.month
+          ? Intl.DateTimeFormat(undefined, {
+              month: "short",
+              year: "2-digit",
+            }).format(new Date(doc.month))
+          : Intl.DateTimeFormat(undefined, {
+              day: "numeric",
+              month: "numeric",
+            }).format(new Date(doc.updatedAt))
+      );
+      datasets.push(doc.debit ? Math.abs(doc.credit - doc.debit) : doc.amount);
+      return 0;
+    });
+    return {
+      labels: labels.reverse(),
+      datasets: [
+        {
+          label: "Expenses",
+          data: datasets.reverse(),
+          fill: false,
+          backgroundColor: "rgb(255, 99, 132)",
+          borderColor: "rgb(255, 99, 132)",
+          tension: 0.2,
+        },
+      ],
+    };
+  };
+  const Grid = (props) => {
+    const [data, setData] = useState([]);
+    useEffect(() => {
+      if (props.accountName === "Cash") {
+        axios
+          .get(`${API}/cash/${firebase.auth().currentUser.uid}/4`)
+          .then((res) => {
+            setData(res.data);
+          })
+          .catch((err) => console.error(err));
+      } else {
+        axios
+          .get(`${API}/banks/${props.id}/${firebase.auth().currentUser.uid}/4`)
+          .then((res) => {
+            setData(res.data);
+          })
+          .catch((err) => console.error(err));
+      }
+    }, [props.accountName, props.id]);
+    return data.length > 0 ? (
+      <div className="bal-grid">
+        <div className="card">
+          <Line data={balance(data)} options={options("Balance")} />
+        </div>
+        <div className="card">
+          <Line data={expenses(data)} options={options("Expenses")} />
+        </div>
+      </div>
+    ) : (
+      <p>No data available</p>
+    );
   };
   return (
     <div className="balance">
@@ -280,51 +343,43 @@ const Analytics = () => {
         </Link>
       </div>
       <div className="card">
-        <div>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <GrCurrency
-              className="black"
-              style={{ fontSize: "1.2rem", marginRight: "10px" }}
-            />
-            <p>Cash</p>
-          </div>
-          <div className="bal-grid">
-            <div className="card">
-              <Line data={balance.data} options={balance.options} />
-            </div>
-            <div className="card">
-              <Line data={expenses.data} options={expenses.options} />
-            </div>
-          </div>
-        </div>
-        <Divider />
-        <div>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <AiOutlineBank
-              className="black"
-              style={{ fontSize: "1.2rem", marginRight: "10px" }}
-            />
-            <p>HDFC</p>
-          </div>
-          <div className="bal-grid">
-            <div className="card">
-              <Line data={balance.data} options={balance.options} />
-            </div>
-            <div className="card">
-              <Line data={expenses.data} options={expenses.options} />
-            </div>
-          </div>
-        </div>
+        {transactions &&
+          acc.map((d, index) => {
+            return (
+              <div key={`${d.accountName}-${index}`}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    {d.accountName === "Cash" ? (
+                      <GrCurrency
+                        className="black"
+                        style={{ fontSize: "1.2rem", marginRight: "10px" }}
+                      />
+                    ) : (
+                      <AiOutlineBank
+                        className="black"
+                        style={{ fontSize: "1.2rem", marginRight: "10px" }}
+                      />
+                    )}
+                    <p>{d.accountName}</p>
+                  </div>
+                  <Grid id={d.id} accountName={d.accountName} />
+                </div>
+                <Divider />
+              </div>
+            );
+          })}
       </div>
     </div>
   );
 };
 const Transactions = () => {
+  const transactions = useSelector((state) => state.transactions);
+  const acc = useSelector((state) => state.accounts);
   const cols = [
     { field: "id", headerName: "ID", width: 70, hide: true },
     { field: "month", headerName: "Month", width: 100 },
     {
-      field: "openBal",
+      field: "openingBalance",
       headerName: "Opening Balance",
       type: "number",
       width: 190,
@@ -332,46 +387,99 @@ const Transactions = () => {
     { field: "debit", headerName: "Debit (-)", type: "number", width: 125 },
     { field: "credit", headerName: "Credit (+)", type: "number", width: 125 },
     {
-      field: "closeBal",
+      field: "closingBalance",
       headerName: "Closing Balance",
       type: "number",
       width: 190,
     },
   ];
-  const rows = [
+  const colsCash = [
+    { field: "id", headerName: "ID", width: 70, hide: true },
+    { field: "updatedAt", headerName: "Date", width: 100 },
     {
-      id: 1,
-      month: "Apr",
-      openBal: 25000,
-      debit: 1000,
-      credit: 25,
-      closeBal: 25000 - 1000 + 25,
+      field: "amount",
+      headerName: "Amount",
+      type: "number",
+      width: 125,
     },
-    {
-      id: 2,
-      month: "Mar",
-      openBal: 26000,
-      debit: 1000,
-      credit: 25,
-      closeBal: 26000 - 1000 + 25,
-    },
-    {
-      id: 3,
-      month: "Feb",
-      openBal: 27000,
-      debit: 1000,
-      credit: 25,
-      closeBal: 27000 - 1000 + 25,
-    },
-    {
-      id: 4,
-      month: "Jan",
-      openBal: 28000,
-      debit: 1000,
-      credit: 25,
-      closeBal: 28000 - 1000 + 25,
-    },
+    { field: "description", headerName: "Description", width: 190 },
+    { field: "balance", headerName: "Balance", type: "number", width: 125 },
   ];
+  const rows = (data, accountName) => {
+    let rows = [];
+    if (accountName === "Cash") {
+      data.map((d) => {
+        rows.push({
+          id: d.id,
+          amount: d.amount,
+          description: d.description,
+          updatedAt: Intl.DateTimeFormat(undefined, {
+            day: "numeric",
+            month: "short",
+          }).format(new Date(d.updatedAt)),
+          balance: acc[0].initialBalance + d.balance,
+        });
+        return 0;
+      });
+    } else {
+      data.map((d) => {
+        rows.push({
+          id: d.id,
+          month: Intl.DateTimeFormat(undefined, {
+            month: "short",
+            year: "numeric",
+          }).format(new Date(d.month)),
+          openingBalance: d.openingBalance,
+          closingBalance: d.closingBalance,
+          debit: d.debit,
+          credit: d.credit,
+        });
+        return 0;
+      });
+    }
+    return rows;
+  };
+  const Table = (props) => {
+    const [data, setData] = useState([]);
+    useEffect(() => {
+      if (props.accountName === "Cash") {
+        axios
+          .get(`${API}/cash/${firebase.auth().currentUser.uid}/4`)
+          .then((res) => {
+            setData(res.data);
+          })
+          .catch((err) => console.error(err));
+      } else {
+        axios
+          .get(`${API}/banks/${props.id}/${firebase.auth().currentUser.uid}/4`)
+          .then((res) => {
+            setData(res.data);
+          })
+          .catch((err) => console.error(err));
+      }
+    }, [props.accountName, props.id]);
+    return data.length > 0 ? (
+      <>
+        <div style={{ margin: "10px 0" }}>
+          <DataGrid
+            density="compact"
+            columns={props.accountName === "Cash" ? colsCash : cols}
+            rows={rows(data, props.accountName)}
+            autoHeight={true}
+            hideFooter={true}
+            autoPageSize={true}
+            className="transac-comp"
+          />
+        </div>
+        <TransacsMob
+          rows={rows(data, props.accountName)}
+          accountName={props.accountName}
+        />
+      </>
+    ) : (
+      <p>No data available</p>
+    );
+  };
   return (
     <div className="balance">
       <div className="head">
@@ -387,52 +495,36 @@ const Transactions = () => {
         </Link>
       </div>
       <div className="card">
-        <div>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <GrCurrency
-              className="black"
-              style={{ fontSize: "1.2rem", marginRight: "10px" }}
-            />
-            <p>Cash</p>
-          </div>
-          <div style={{ padding: "10px 0" }}>
-            <DataGrid
-              density="compact"
-              columns={cols}
-              rows={rows}
-              autoHeight={true}
-              hideFooter={true}
-              autoPageSize={true}
-              className="transac-comp"
-            />
-            <TransacsMob rows={rows} />
-          </div>
-        </div>
-        <Divider />
-        <div>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <AiOutlineBank
-              className="black"
-              style={{ fontSize: "1.2rem", marginRight: "10px" }}
-            />
-            <p>HDFC</p>
-          </div>
-          <div style={{ padding: "10px 0" }}>
-            <DataGrid
-              density="compact"
-              columns={cols}
-              rows={rows}
-              autoHeight={true}
-              hideFooter={true}
-              autoPageSize={true}
-            />
-          </div>
-        </div>
+        {transactions &&
+          acc.map((d, index) => {
+            return (
+              <div key={`${d.accountName}-${index}`}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    {d.accountName === "Cash" ? (
+                      <GrCurrency
+                        className="black"
+                        style={{ fontSize: "1.2rem", marginRight: "10px" }}
+                      />
+                    ) : (
+                      <AiOutlineBank
+                        className="black"
+                        style={{ fontSize: "1.2rem", marginRight: "10px" }}
+                      />
+                    )}
+                    <p>{d.accountName}</p>
+                  </div>
+                  <Table id={d.id} accountName={d.accountName} />
+                </div>
+                {index === acc.length - 1 ? null : <Divider />}
+              </div>
+            );
+          })}
       </div>
     </div>
   );
 };
-function TransacsMob({ rows }) {
+function TransacsMob({ rows, accountName }) {
   const currencyFormat = (currency) => {
     let val = new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -444,29 +536,51 @@ function TransacsMob({ rows }) {
   return (
     <div
       className="card transac-mob"
-      style={{ padding: "5px", display: "none" }}>
+      style={{ padding: "0 5px", display: "none", margin: "10px 0" }}>
       <List dense={true}>
-        {rows.map((data, index) => (
-          <div key={index}>
-            <ListItem button>
-              <ListItemText
-                primary={data.month}
-                secondary={`${currencyFormat(data.closeBal)} [${
-                  -data.debit + data.credit
-                }]`}
-              />
-              <ListItemSecondaryAction style={{ textAlign: "right" }}>
-                <div style={{ color: "red" }}>
-                  {currencyFormat(-data.debit)}
-                </div>
-                <div style={{ color: "green" }}>
-                  {"+" + currencyFormat(data.credit)}
-                </div>
-              </ListItemSecondaryAction>
-            </ListItem>
-            {index === rows.length - 1 ? null : <Divider />}
-          </div>
-        ))}
+        {accountName === "Cash"
+          ? rows.map((data, index) => (
+              <div key={index}>
+                <ListItem button>
+                  <ListItemText
+                    primary={<b>{data.description}</b>}
+                    secondary={`${data.updatedAt}`}
+                  />
+                  <ListItemSecondaryAction style={{ textAlign: "right" }}>
+                    <div
+                      style={
+                        data.amount > 0 ? { color: "green" } : { color: "red" }
+                      }>
+                      {`${data.amount > 0 ? "+" : ""}${currencyFormat(
+                        data.amount
+                      )}`}
+                    </div>
+                  </ListItemSecondaryAction>
+                </ListItem>
+                {index === rows.length - 1 ? null : <Divider />}
+              </div>
+            ))
+          : rows.map((data, index) => (
+              <div key={index}>
+                <ListItem button>
+                  <ListItemText
+                    primary={data.month}
+                    secondary={`${currencyFormat(data.closingBalance)} [${
+                      -data.debit + data.credit
+                    }]`}
+                  />
+                  <ListItemSecondaryAction style={{ textAlign: "right" }}>
+                    <div style={{ color: "red" }}>
+                      {currencyFormat(-data.debit)}
+                    </div>
+                    <div style={{ color: "green" }}>
+                      {"+" + currencyFormat(data.credit)}
+                    </div>
+                  </ListItemSecondaryAction>
+                </ListItem>
+                {index === rows.length - 1 ? null : <Divider />}
+              </div>
+            ))}
       </List>
     </div>
   );

@@ -19,7 +19,7 @@ import {
 import { FirebaseAuthConsumer } from "@react-firebase/auth";
 import React, { useEffect, useState } from "react";
 import { AiOutlineBank } from "react-icons/ai";
-import { MdDelete, MdPersonAdd, MdSearch } from "react-icons/md";
+import { MdCheck, MdDelete, MdPersonAdd, MdSearch } from "react-icons/md";
 import { GrCurrency } from "react-icons/gr";
 import { Link } from "react-router-dom";
 import App from "./App";
@@ -27,6 +27,10 @@ import firebase from "firebase/app";
 import { signOut } from "./firebase";
 import { banks } from "./banks";
 import { Autocomplete } from "@material-ui/lab";
+import Axios from "axios";
+import { API } from "./config";
+import { useDispatch, useSelector } from "react-redux";
+import { getAccList } from "./actions";
 
 export default function Profile() {
   return (
@@ -84,49 +88,80 @@ export default function Profile() {
   );
 }
 const AccountList = () => {
-  const [acc, setAcc] = useState([
-    {
-      accountName: "Cash",
-      balance: 0,
-      index: 0,
-      updatedAt: "Never",
-    },
-  ]);
-  useEffect(() => {
-    const db = firebase.firestore();
-    let unsub = db
-      .collection("users")
-      .doc(firebase.auth().currentUser.uid)
-      .onSnapshot((doc) => {
-        if (doc.exists) {
-          if (doc.data().balance) {
-            let arr = doc.data().balance;
-            arr.sort((a, b) => a.index - b.index);
-            setAcc(arr);
-          }
-          console.log(doc.data());
+  const acc = useSelector((state) => state.accounts);
+  const dispatch = useDispatch();
+  const readData = () => {
+    Axios.get(`${API}/accounts/${firebase.auth().currentUser.uid}`)
+      .then((res) => {
+        console.log(res.data);
+        if (res.data.length > 0) {
+          dispatch(getAccList(res.data));
+          setVal(res.data[0].initialBalance);
+          setInitBal(res.data[0].initialBalance);
         }
-      });
-    return () => {
-      unsub();
-    };
-  }, []);
-  const handleClick = (data) => {
-    let db = firebase.firestore();
-    let docRef = db
-      .collection("users")
-      .doc(`${firebase.auth().currentUser.uid}`);
-    docRef
-      .update({
-        balance: firebase.firestore.FieldValue.arrayRemove(data),
       })
+      .catch((err) => console.error(err));
+  };
+  useEffect(() => {
+    readData();
+  }, [dispatch]);
+  const [val, setVal] = useState(0);
+  const [initialBal, setInitBal] = useState(0);
+  const handleChange = (event) => {
+    console.log(initialBal);
+    setVal(event.target.value);
+  };
+  const updateBal = (amount) => {
+    Axios.put(`${API}/accounts/updateInitialBal`, {
+      accountName: "Cash",
+      initialBal: amount,
+      updatedAt: new Date().toISOString().substr(0, 10),
+      user_id: firebase.auth().currentUser.uid,
+    })
       .then(() => {
-        console.log("removed");
+        setInitBal(amount);
+        readData();
+      })
+      .catch((err) => console.error(err));
+  };
+  const handleClick = (data) => {
+    Axios.delete(`${API}/accounts/delete`, {
+      data: {
+        accountName: data.accountName,
+        user_id: data.user_id,
+      },
+    })
+      .then(() => {
+        readData();
       })
       .catch((err) => console.error(err));
   };
   return (
     <>
+      <TextField
+        placeholder="0"
+        label="Cash Initial Balance"
+        type="number"
+        value={val}
+        onChange={handleChange}
+        style={{ margin: "10px 0" }}
+        variant="outlined"
+        fullWidth
+        InputProps={{
+          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+          endAdornment:
+            val !== "" && val !== initialBal ? (
+              <InputAdornment position="end">
+                <IconButton
+                  onClick={() => {
+                    updateBal(Number(val));
+                  }}>
+                  <MdCheck style={{ color: "green" }} />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+        }}
+      />
       {acc.map((data, index) => (
         <ListItem key={index + "-accList"}>
           <ListItemIcon>
@@ -166,55 +201,55 @@ const DialogBox = () => {
   const [accountNo, setAccount] = useState("");
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
+  const acc = useSelector((state) => state.accounts);
+  const dispatch = useDispatch();
   const handleClick = (d) => {
-    let db = firebase.firestore();
-    let docRef = db
-      .collection("users")
-      .doc(`${firebase.auth().currentUser.uid}`);
-    docRef.get().then((doc) => {
-      if (doc.data().balance) {
-        docRef
-          .update({
-            balance: firebase.firestore.FieldValue.arrayUnion({
-              accountName: d,
-              index: doc.data().balance.length,
-              balance: 0,
-              updatedAt: "Never",
-            }),
-          })
-          .then(() => {
-            handleClose();
-            console.log("updated");
-          })
-          .catch((err) => console.error(err));
-      } else {
-        docRef
-          .set(
-            {
-              balance: [
-                {
-                  accountName: "Cash",
-                  balance: 0,
-                  index: 0,
-                  updatedAt: "Never",
-                },
-                {
-                  accountName: d,
-                  balance: 0,
-                  index: 1,
-                  updatedAt: "Never",
-                },
-              ],
-            },
-            { merge: true }
-          )
-          .then(() => {
-            handleClose();
-            console.log("set");
-          })
-          .catch((err) => console.error(err));
-      }
-    });
+    const readData = () => {
+      Axios.get(`${API}/accounts/${firebase.auth().currentUser.uid}`)
+        .then((res) => {
+          console.log(res.data);
+          if (res.data.length > 0) dispatch(getAccList(res.data));
+        })
+        .catch((err) => console.error(err));
+    };
+
+    if (acc.length > 0) {
+      Axios.post(`${API}/accounts/add`, [
+        {
+          accountName: d,
+          balance: 0,
+          user_id: firebase.auth().currentUser.uid,
+          updatedAt: new Date().toISOString().substr(0, 10),
+        },
+      ])
+        .then(() => {
+          readData();
+          handleClose();
+          console.log("updated");
+        })
+        .catch((err) => console.error(err));
+    } else {
+      Axios.post(`${API}/accounts/add`, [
+        {
+          accountName: "Cash",
+          balance: 0,
+          user_id: firebase.auth().currentUser.uid,
+          updatedAt: new Date().toISOString().substr(0, 10),
+        },
+        {
+          accountName: d,
+          balance: 0,
+          user_id: firebase.auth().currentUser.uid,
+          updatedAt: new Date().toISOString().substr(0, 10),
+        },
+      ])
+        .then(() => {
+          readData();
+          handleClose();
+          console.log("updated");
+        })
+        .catch((err) => console.error(err));
+    }
   };
 
   const fs = useMediaQuery(useTheme().breakpoints.down("xs"));
@@ -300,8 +335,8 @@ const DialogBox = () => {
             <Button
               color="primary"
               onClick={() => {
-                console.log(`${bank}${accountNo ? `-${accountNo}` : ""}`);
-                handleClick(`${bank}${accountNo ? `-${accountNo}` : ""}`);
+                console.log(`${bank}${accountNo ? ` - ${accountNo}` : ""}`);
+                handleClick(`${bank}${accountNo ? ` - ${accountNo}` : ""}`);
               }}>
               Continue
             </Button>

@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "δ Financely",
+  "name": "δ Financely",
   "icons": [
     {
       "src": "favicon.ico",
@@ -8,18 +8,43 @@
       "type": "image/x-icon"
     },
     {
-      "src": "logo192.png",
+      "src": "android-chrome-192x192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "logo512.png",
+      "src": "web_hi_res_512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose":"any maskable"
     }
   ],
   "start_url": ".",
+  "description":"Keep track of your expenses and transactions without connecting with your bank.",
+  "shortcuts":[
+    {
+      "name": "Analytics",
+      "short_name": "Analytics",
+      "description": "View analytics",
+      "url": "/analytics",
+      "icons": [{ "src": "analytics.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Transactions",
+      "short_name": "Transactions",
+      "description": "View transactions",
+      "url": "/transactions",
+      "icons": [{ "src": "transactions.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Profile",
+      "short_name": "Profile",
+      "description": "View profile",
+      "url": "/profile",
+      "icons": [{ "src": "profile.png", "sizes": "192x192" }]
+    }
+  ],
   "display": "standalone",
-  "theme_color": "#000000",
+  "theme_color": "#e6e6e6",
   "background_color": "#ffffff"
 }
