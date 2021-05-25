@@ -188,7 +188,11 @@ const Graph = (props) => {
           maxWidth: "768px",
           alignSelf: "center",
         }}>
-        <Line data={balance(data)} options={options} />
+        {data.length > 0 ? (
+          <Line data={balance(data)} options={options} />
+        ) : (
+          <p>No data available</p>
+        )}
       </div>
     </div>
   );

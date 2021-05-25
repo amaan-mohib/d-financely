@@ -214,7 +214,7 @@ const Table = (props) => {
         .catch((err) => console.error(err));
     }
   };
-  return (
+  return data.length > 0 ? (
     <div
       style={{ padding: "10px 0", display: "flex", flexDirection: "column" }}>
       <Transacs
@@ -241,6 +241,8 @@ const Table = (props) => {
         }}
       />
     </div>
+  ) : (
+    <p>No data available</p>
   );
 };
 function TransacsMob({ rows, accountName }) {

@@ -16,12 +16,12 @@
       "src": "web_hi_res_512.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose":"any maskable"
+      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
-  "description":"Keep track of your expenses and transactions without connecting with your bank.",
-  "shortcuts":[
+  "description": "Keep track of your expenses and transactions without connecting with your bank.",
+  "shortcuts": [
     {
       "name": "Analytics",
       "short_name": "Analytics",

@@ -139,7 +139,7 @@ const Balance = () => {
             currency: "INR",
           }).format(
             props.accountName === "Cash"
-              ? props.initialBalance + props.balance
+              ? Number(props.initialBalance + props.balance)
               : props.balance
           )}`}
         </h2>
