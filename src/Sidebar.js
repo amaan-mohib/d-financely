@@ -87,7 +87,7 @@ export default function Sidebar() {
             },
           ])
           .then(() => {
-            if (bal.length > 1) {
+            if (bal[0].updatedAt !== "Never") {
               axios
                 .put(`${API}/accounts/update`, {
                   balance:

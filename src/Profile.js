@@ -138,30 +138,33 @@ const AccountList = () => {
   };
   return (
     <>
-      <TextField
-        placeholder="0"
-        label="Cash Initial Balance"
-        type="number"
-        value={val}
-        onChange={handleChange}
-        style={{ margin: "10px 0" }}
-        variant="outlined"
-        fullWidth
-        InputProps={{
-          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
-          endAdornment:
-            val !== "" && val !== initialBal ? (
-              <InputAdornment position="end">
-                <IconButton
-                  onClick={() => {
-                    updateBal(Number(val));
-                  }}>
-                  <MdCheck style={{ color: "green" }} />
-                </IconButton>
-              </InputAdornment>
-            ) : null,
-        }}
-      />
+      {acc[0].updatedAt === "Never" ? null : (
+        <TextField
+          placeholder="0"
+          label="Cash Initial Balance"
+          type="number"
+          value={val}
+          onChange={handleChange}
+          style={{ margin: "10px 0" }}
+          variant="outlined"
+          fullWidth
+          InputProps={{
+            startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+            endAdornment:
+              val !== "" && val !== initialBal ? (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => {
+                      updateBal(Number(val));
+                    }}>
+                    <MdCheck style={{ color: "green" }} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+          }}
+        />
+      )}
+
       {acc.map((data, index) => (
         <ListItem key={index + "-accList"}>
           <ListItemIcon>
